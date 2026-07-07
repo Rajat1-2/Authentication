@@ -1,0 +1,14 @@
+import dotenv from "dotenv";
+
+dotenv.config();
+console.log(process.env.MONGO_URI)
+
+if (!process.env.MONGO_URI) {
+  throw new Error("MONGO_URI is not defined in .env");
+}
+
+const config = {
+  MONGO_URI: process.env.MONGO_URI,
+};
+
+export default config;
