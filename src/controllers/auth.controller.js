@@ -222,10 +222,20 @@ export async function logout(req, res) {
   //   agr session mila tb cookie clr kro and
   // revoked true krke save kr do
   session.revoked = true;
+//   jb logout kra tb hmne refresh token toinvalid kr dia 
+// pr access token to ab bhi valid h na ab koibhi use use krke
+// bhi use kr skta h web
+// so we use blacklist like in redix etc..
+// jo token blacklist me hoga server use bhi rew nhi dega
+// other is lower the limit of accesstoken  like 5 min or 10 min
   await session.save();
 
   res.clearCookie("refreshToken");
   res.status(200).json({
     message: "logout successfully",
   });
+}
+
+export async function  logoutAll(req,res){
+    
 }
