@@ -1,4 +1,5 @@
 import userModel from "../models/user.model.js";
+import sessionModel from "../models/session.model.js";
 import crypto from "crypto";
 import jwt from "jsonwebtoken";
 import config from "../config/config.js";
@@ -33,16 +34,8 @@ export async function register(req, res) {
   //   access token -15min
   // refresh token - 5 din
 
-  const accessToken = jwt.sign(
-    {
-      // use rki db id
-      id: user._id,
-    },
-    config.JWT_SECRET,
-    {
-      expiresIn: "15m",
-    }
-  );
+  //   jb refresh token bna rhe tbhihm ek session bhi bna lenge in db
+  // for logout from all devices
   const refreshToken = jwt.sign(
     {
       // use rki db id
@@ -53,6 +46,33 @@ export async function register(req, res) {
       expiresIn: "7d",
     }
   );
+  //   hashing the refresh token for session
+  const refreshTokenHash = crypto
+    .createHash("sha256")
+    .update(refreshToken)
+    .digest("hex");
+
+  //   creating a session
+  const session = await sessionModel.create({
+    user: user._id,
+    refreshTokenHash,
+    ip: req.ip,
+    userAgent: req.headers["user-agent"],
+  });
+
+  const accessToken = jwt.sign(
+    {
+      // use rki db id
+      id: user._id,
+      //   session ki id bhi store krte h
+      sessionId: session._id,
+    },
+    config.JWT_SECRET,
+    {
+      expiresIn: "15m",
+    }
+  );
+
   //   refresh token ko cookie me save krte h
   res.cookie("refreshToken", refreshToken, {
     httpOnly: true, //client side js use decode nhi kr payegi
@@ -113,8 +133,26 @@ export async function refreshtheToken(req, res) {
       message: "no valid refresh token",
     });
   }
-
+  // yha hm session check krenge agr session revoked hoga to ab
+  // gen nhi krenge
   const decoded = jwt.verify(refreshToken, config.JWT_SECRET);
+  const refreshTokenHash = crypto
+    .createHash("sha256")
+    .update(refreshToken)
+    .digest("hex");
+
+   const session= await sessionModel.findOne({
+    refreshTokenHash,
+    revoked:false
+   })
+//    ys to hash glt hoga ya revoked/logout ho gya  hoga dono case me nhi gen krna h
+   if(!session){
+    res.status(401).json({
+        message:"invalid refresh token"
+    })
+   }
+
+
   //   refresh token me id hogi bs us id keliye nya accesss token bnado
   const accesstoken = jwt.sign(
     {
@@ -135,7 +173,15 @@ export async function refreshtheToken(req, res) {
       expiresIn: "7d",
     }
   );
-//   hr cookie res me same name jana chaiye cookie ka 
+//   new refrsh tokrn ke liye new hash update kkrna hoga session me
+  const newRefreshTokenHash = crypto
+    .createHash("sha256")
+    .update(newRefreshToken)
+    .digest("hex");
+
+   session.refreshTokenHash=newRefreshTokenHash;
+   await session.save();
+  //   hr cookie res me same name jana chaiye cookie ka
   res.cookie("refreshToken", newRefreshToken, {
     httpOnly: true,
     secure: false,
@@ -148,8 +194,38 @@ export async function refreshtheToken(req, res) {
   });
 }
 
-
-
 // logout from all devices like laptop,tablet,phone etc..
-// each device maintaiin a session 
+// each device maintaiin a session
 // {user,refreshtokenhash,ip,useragent,createdAT,updatedAt}
+export async function logout(req, res) {
+  const refreshToken = req.cookies.refreshToken;
+  if (!refreshToken) {
+    res.status(400).json({
+      message: "refresh token is invalid",
+    });
+  }
+  // convert it in hash for finding
+  const refreshTokenHash = crypto
+    .createHash("sha256")
+    .update(refreshToken)
+    .digest("hex");
+
+  const session = await sessionModel.findOne({
+    refreshTokenHash,
+    revoked: false,
+  });
+  if (!session) {
+    res.status(400).json({
+      message: "no session exists ",
+    });
+  }
+  //   agr session mila tb cookie clr kro and
+  // revoked true krke save kr do
+  session.revoked = true;
+  await session.save();
+
+  res.clearCookie("refreshToken");
+  res.status(200).json({
+    message: "logout successfully",
+  });
+}

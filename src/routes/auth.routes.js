@@ -11,4 +11,6 @@ authRouter.get("/get-me",authController.getMe);
 // reffresh token se new access token bnao
 authRouter.get("/refreshtoken",authController.refreshtheToken);
 
+authRouter.get("/logout",authController.logout);
+
 export default authRouter;
