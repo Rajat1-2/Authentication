@@ -5,6 +5,9 @@ import jwt from "jsonwebtoken";
 import config from "../config/config.js";
 import cookieParser from "cookie-parser";
 
+
+// register me email verify se pehle koi bhi 
+// access ya refresh tokrn nhi bhjte hm
 export async function register(req, res) {
   const { username, email, password } = req.body;
   const isAlredyRegistered = await userModel.findOne({
