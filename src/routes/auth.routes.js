@@ -6,6 +6,8 @@ const authRouter =Router();
 
 // api /api/auth/register
 authRouter.post("/register",authController.register);
+// localhost:3000//api/auth/login
+authRouter.post("/login",authController.login);
 //  get /api/auth/get-me
 authRouter.get("/get-me",authController.getMe);
 // reffresh token se new access token bnao
@@ -15,4 +17,4 @@ authRouter.get("/refreshtoken",authController.refreshtheToken);
 authRouter.get("/logout", authController.logout);
 //localhost:3000/api/auth/logoutAll
 authRouter.get("/logoutAll",authController.logoutAll);
-http: export default authRouter;
+ export default authRouter;

@@ -91,6 +91,60 @@ export async function register(req, res) {
   });
 }
 
+export async function login(req,res){
+    // username , pass check kro then use access token do
+    const {email,password}=req.body;
+    const decoded=crypto.createHash("sha256").update(password).digest("hex")
+    const user=await userModel.findOne({
+      email,
+      password:decoded,
+    })
+    if(!user){
+     return  res.status(401).json({
+        message:"invalid credintials"
+      })
+    }
+    // to access token de do 
+    // vhi same register wali 
+    const refreshToken=jwt.sign(
+      {
+      id:user._id,
+    },
+    config.JWT_SECRET,
+    {
+      expiresIn:"7d"
+    }
+  )
+  const refreshTokenHash=crypto.createHash("sha256").update(refreshToken).digest("hex")
+  const session = await sessionModel.create({
+    user: user._id,
+    refreshTokenHash,
+    ip: req.ip,
+    userAgent: req.headers["user-agent"],
+  });
+  const accessToken=jwt.sign(
+    {
+      id:user._id,
+      sessionId:session._id
+    },
+    config.JWT_SECRET,
+    {
+      expiresIn:"15m"
+    }
+  )
+
+  res.cookie("refreshToken",refreshToken,{
+    httpOnly:true,
+    secure:true,
+    sameSite:"strict",
+    maxAge: 7 * 24 * 60 * 60 * 1000, //7days
+  })
+
+  res.status(201).json({
+    message:"login successfully"
+  })
+}
+
 // user konsa h ->via token
 export async function getMe(req, res) {
   // req me bearer space token hota h token ese hi nikalenge [1]
@@ -157,6 +211,7 @@ export async function refreshtheToken(req, res) {
   const accesstoken = jwt.sign(
     {
       id: decoded.id,
+      sessionID:session._id,
     },
     config.JWT_SECRET,
     {
@@ -237,5 +292,23 @@ export async function logout(req, res) {
 }
 
 export async function  logoutAll(req,res){
-    
+    const refreshToken=req.cookies.refreshToken;
+    if(!refreshToken){
+      res.status(401).json({
+        message:"no valid refresh token"
+      })
+    }
+
+    const decoded=jwt.verify(refreshToken,config.JWT_SECRET);
+
+    await sessionModel.updateMany({
+      user:decoded.id,
+      revoked:false,
+    },{
+      revoked:true,
+    })
+    res.clearCookie("refreshToken")
+    res.status(200).json({
+      message:"logout form all devices successfully"
+    })
 }
